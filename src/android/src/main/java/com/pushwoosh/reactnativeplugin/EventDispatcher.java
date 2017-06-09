@@ -9,6 +9,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import android.util.Log;
+
 public class EventDispatcher {
 
     private  Map<String, List<Callback>> subscribers = new HashMap<String, List<Callback>>();
@@ -45,6 +47,7 @@ public class EventDispatcher {
     }
 
     public void sendJSEvent(ReactContext reactContext, String event, Map<String, Object> params) {
+        Log.d(PushwooshPlugin.TAG, "sendJSEvent " + event);
         reactContext.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
                 .emit(event, ConversionUtil.toWritableMap(params));
     }

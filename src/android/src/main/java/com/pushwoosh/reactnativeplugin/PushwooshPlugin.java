@@ -33,7 +33,7 @@ import java.util.Objects;
 
 public class PushwooshPlugin extends ReactContextBaseJavaModule implements LifecycleEventListener {
 
-    static final String TAG = "ReactNativePlugin";
+    static final String TAG = "RNPushwoosh";
 
     static final String PUSH_OPEN_JS_EVENT = "pushOpened";
 
@@ -117,10 +117,6 @@ public class PushwooshPlugin extends ReactContextBaseJavaModule implements Lifec
 
         try {
             synchronized (mStartPushLock) {
-                mStartPushData = pushData;
-                if (mPushCallbackRegistered) {
-                    mEventDispatcher.dispatchEvent(PushManager.PUSH_RECEIVE_EVENT, ConversionUtil.toWritableMap(ConversionUtil.stringToMap(pushData)));
-                }
                 if (mInitialized && INSTANCE != null) {
                     INSTANCE.sendEvent(PUSH_OPEN_JS_EVENT, ConversionUtil.stringToMap(pushData));
                 }
@@ -197,20 +193,6 @@ public class PushwooshPlugin extends ReactContextBaseJavaModule implements Lifec
         mEventDispatcher.subscribe(PushManager.UNREGISTER_EVENT, success);
         mEventDispatcher.subscribe(PushManager.UNREGISTER_ERROR_EVENT, error);
         mPushManager.unregisterForPushNotifications();
-    }
-
-    @ReactMethod
-    public void onPushOpen(Callback callback) {
-        synchronized (mStartPushLock) {
-            if (!mPushCallbackRegistered && mStartPushData != null) {
-                callback.invoke(ConversionUtil.toWritableMap(ConversionUtil.stringToMap(mStartPushData)));
-                mPushCallbackRegistered = true;
-                return;
-            }
-
-            mPushCallbackRegistered = true;
-            mEventDispatcher.subscribe(PushManager.PUSH_RECEIVE_EVENT, callback);
-        }
     }
 
     @ReactMethod
