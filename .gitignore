@@ -1,3 +1,4 @@
 src/ios/PushwooshPlugin.xcodeproj/xcuserdata
 *.xcuserstate
 src/ios/build
+src/android/build
