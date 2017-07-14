@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.util.Log;
 
 import com.facebook.react.bridge.Callback;
 import com.facebook.react.bridge.LifecycleEventListener;
@@ -20,9 +21,6 @@ import com.pushwoosh.BasePushMessageReceiver;
 import com.pushwoosh.BaseRegistrationReceiver;
 import com.pushwoosh.PushManager;
 import com.pushwoosh.SendPushTagsCallBack;
-import com.pushwoosh.inapp.InAppFacade;
-import com.pushwoosh.internal.utils.JsonUtils;
-import com.pushwoosh.internal.utils.PWLog;
 import com.pushwoosh.notification.SoundType;
 import com.pushwoosh.notification.VibrateType;
 
@@ -50,7 +48,7 @@ public class PushwooshPlugin extends ReactContextBaseJavaModule implements Lifec
 
     private static PushwooshPlugin INSTANCE = null;
 
-    BroadcastReceiver mRegistationReceiver = new BaseRegistrationReceiver() {
+    BroadcastReceiver mRegistrationReceiver = new BaseRegistrationReceiver() {
         @Override
         protected void onRegisterActionReceive(Context context, Intent intent) {
             if (intent == null) {
@@ -102,10 +100,10 @@ public class PushwooshPlugin extends ReactContextBaseJavaModule implements Lifec
             }
         }
         catch (Exception e) {
-            PWLog.exception(e);
+            Log.e(TAG, e.getMessage());
         }
 
-        PWLog.debug(TAG, "broadcastPush = " + mBroadcastPush);
+        Log.d(TAG, "broadcastPush = " + mBroadcastPush);
 
         registerPushReceiver();
 
@@ -113,18 +111,20 @@ public class PushwooshPlugin extends ReactContextBaseJavaModule implements Lifec
     }
 
     public static void openPush(String pushData) {
-        PWLog.info(TAG, "Push open: " + pushData);
+        Log.i(TAG, "Push open: " + pushData);
 
         try {
             synchronized (mStartPushLock) {
                 if (mInitialized && INSTANCE != null) {
                     INSTANCE.sendEvent(PUSH_OPEN_JS_EVENT, ConversionUtil.stringToMap(pushData));
+                } else {
+                    Log.e(TAG, "Push open lost to ReactNative");
                 }
             }
         }
         catch (Exception e) {
             // React Native is highly unstable
-            PWLog.exception(e);
+            Log.e(TAG, e.getMessage());
         }
     }
 
@@ -151,7 +151,7 @@ public class PushwooshPlugin extends ReactContextBaseJavaModule implements Lifec
 
         Context context = getReactApplicationContext();
 
-        context.registerReceiver(mRegistationReceiver, new IntentFilter(context.getPackageName() + "." + PushManager.REGISTER_BROAD_CAST_ACTION));
+        context.registerReceiver(mRegistrationReceiver, new IntentFilter(context.getPackageName() + "." + PushManager.REGISTER_BROAD_CAST_ACTION));
 
         PushManager.initializePushManager(context, appId, projectId);
 
@@ -161,7 +161,7 @@ public class PushwooshPlugin extends ReactContextBaseJavaModule implements Lifec
             mPushManager.onStartup(context);
         }
         catch (Exception e) {
-            PWLog.exception(e);
+            Log.e(TAG, e.getMessage());
             if (error != null) {
                 error.invoke(e.getMessage());
             }
@@ -331,25 +331,25 @@ public class PushwooshPlugin extends ReactContextBaseJavaModule implements Lifec
 
     @Override
     public void onHostResume() {
-        PWLog.noise(TAG, "Host resumed");
+        Log.v(TAG, "Host resumed");
 
         registerPushReceiver();
     }
 
     @Override
     public void onHostPause() {
-        PWLog.noise(TAG, "Host paused");
+        Log.v(TAG, "Host paused");
 
         unregisterPushReceiver();
     }
 
     @Override
     public void onHostDestroy() {
-        PWLog.noise(TAG, "Host destroyed");
+        Log.v(TAG, "Host destroyed");
 
         try {
             Context context = getReactApplicationContext();
-            context.unregisterReceiver(mRegistationReceiver);
+            context.unregisterReceiver(mRegistrationReceiver);
         }
         catch (Exception e) {
 
