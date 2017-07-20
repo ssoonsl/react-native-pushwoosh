@@ -49,10 +49,6 @@ RCT_EXPORT_METHOD(init:(NSDictionary*)config success:(RCTResponseSenderBlock)suc
 	[PushNotificationManager pushManager].delegate = self;
 	[UNUserNotificationCenter currentNotificationCenter].delegate = [PushNotificationManager pushManager].notificationCenterDelegate;
 	
-	if (gStartPushData) {
-		[self sendJSEvent:kPushOpenJSEvent withArgs:gStartPushData];
-	}
-	
 	if (success) {
 		success(@[]);
 	}
@@ -82,6 +78,17 @@ RCT_EXPORT_METHOD(onPushOpen:(RCTResponseSenderBlock)callback) {
 	}
 }
 
+RCT_EXPORT_METHOD(pump:(RCTResponseSenderBlock)callback) {
+    if (gStartPushData) {
+        NSDictionary *pushData = gStartPushData;
+        if (callback) {
+            callback(@[ objectOrNull( pushData ) ]);
+        } else {
+            [self sendJSEvent:kPushOpenJSEvent withArgs:pushData];
+        }
+        gStartPushData = nil;
+    }
+}
 
 RCT_EXPORT_METHOD(getHwid:(RCTResponseSenderBlock)callback) {
 	if (callback) {
@@ -188,6 +195,18 @@ RCT_EXPORT_METHOD(addToApplicationIconBadgeNumber:(nonnull NSNumber*)badgeNumber
 
 // Just keep the launch notification until the module starts and callback functions initalizes
 - (void)onPushAccepted:(PushNotificationManager *)manager withNotification:(NSDictionary *)pushNotification onStart:(BOOL)onStart {
+#if 0
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSData *jsonData = [NSJSONSerialization dataWithJSONObject:gStartPushData options:0 error:nil];
+        NSString *jsonRequestData = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+        UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"Pushwoosh"
+                                                        message:[NSString stringWithFormat:@"onPushAccepted UIApplication data:%@", jsonRequestData]
+                                                       delegate:nil
+                                              cancelButtonTitle:@"OK"
+                                              otherButtonTitles:nil];
+        [alert show];
+    });
+#endif
 	if (onStart) {
 		gStartPushData = pushNotification;
 	}

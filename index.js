@@ -73,6 +73,11 @@ class PushNotification {
 		PushwooshModule.register(success, fail);
 	}
 
+	//Function: pump
+	pump(success: Function) {
+		PushwooshModule.pump(success);
+	}
+
 	//Function: unregister
 	//Unregisters device from push notifications
 	unregister(success: ?Function, fail: ?Function) {
