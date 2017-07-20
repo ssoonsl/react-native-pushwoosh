@@ -43,7 +43,6 @@ public class PushwooshPlugin extends ReactContextBaseJavaModule implements Lifec
 
     private static String mStartPushData;
     private static Object mStartPushLock = new Object();
-    private static boolean mPushCallbackRegistered = false;
     private static boolean mInitialized = false;
 
     private static PushwooshPlugin INSTANCE = null;
@@ -114,12 +113,13 @@ public class PushwooshPlugin extends ReactContextBaseJavaModule implements Lifec
         Log.i(TAG, "Push open: " + pushData);
 
         try {
-            synchronized (mStartPushLock) {
-                if (mInitialized && INSTANCE != null) {
-                    INSTANCE.sendEvent(PUSH_OPEN_JS_EVENT, ConversionUtil.stringToMap(pushData));
-                } else {
-                    Log.e(TAG, "Push open lost to ReactNative");
+            if (mInitialized && INSTANCE != null) {
+                INSTANCE.sendEvent(PUSH_OPEN_JS_EVENT, ConversionUtil.stringToMap(pushData));
+            } else {
+                synchronized (mStartPushLock) {
+                    mStartPushData = pushData;
                 }
+                Log.e(TAG, "Push open lost to ReactNative");
             }
         }
         catch (Exception e) {
@@ -168,17 +168,30 @@ public class PushwooshPlugin extends ReactContextBaseJavaModule implements Lifec
             return;
         }
 
-        synchronized (mStartPushLock) {
-            if (mStartPushData != null) {
-                sendEvent(PUSH_OPEN_JS_EVENT, ConversionUtil.stringToMap(mStartPushData));
-            }
-        }
-
         mInitialized = true;
 
         if (success != null) {
             success.invoke();
         }
+    }
+
+    @ReactMethod
+    public void pump(Callback success)
+    {
+      synchronized (mStartPushLock) {
+        if (mStartPushData != null) {
+          if (success != null) {
+              success.invoke(
+                  ConversionUtil.toWritableMap(
+                    ConversionUtil.stringToMap(mStartPushData)
+                  )
+              );
+          } else {
+              sendEvent(PUSH_OPEN_JS_EVENT, ConversionUtil.stringToMap(mStartPushData));
+          }
+          mStartPushData = null;
+        }
+      }
     }
 
     @ReactMethod
@@ -355,7 +368,6 @@ public class PushwooshPlugin extends ReactContextBaseJavaModule implements Lifec
 
         }
 
-        mPushCallbackRegistered = false;
         mStartPushData = null;
     }
 
