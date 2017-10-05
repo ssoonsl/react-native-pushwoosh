@@ -1,6 +1,7 @@
 package com.pushwoosh.reactnativeplugin;
 
 import android.support.annotation.NonNull;
+import android.util.Log;
 
 import com.facebook.react.bridge.Callback;
 import com.facebook.react.bridge.LifecycleEventListener;
@@ -8,6 +9,9 @@ import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.ReadableMap;
+import com.facebook.react.bridge.WritableMap;
+import com.facebook.react.bridge.Arguments;
+
 import com.pushwoosh.Pushwoosh;
 import com.pushwoosh.badge.PushwooshBadge;
 import com.pushwoosh.exception.GetTagsException;
@@ -16,7 +20,6 @@ import com.pushwoosh.exception.RegisterForPushNotificationsException;
 import com.pushwoosh.exception.UnregisterForPushNotificationException;
 import com.pushwoosh.function.Result;
 import com.pushwoosh.inapp.PushwooshInApp;
-import com.pushwoosh.internal.utils.PWLog;
 import com.pushwoosh.location.PushwooshLocation;
 import com.pushwoosh.notification.PushwooshNotificationSettings;
 import com.pushwoosh.notification.SoundType;
@@ -27,7 +30,7 @@ import org.json.JSONObject;
 
 public class PushwooshPlugin extends ReactContextBaseJavaModule implements LifecycleEventListener {
 
-	static final String TAG = "ReactNativePlugin";
+	static final String TAG = "RNPushwoosh";
 	private static final String PUSH_OPEN_EVENT = "PwPushOpened";
 	private static final String PUSH_OPEN_JS_EVENT = "pushOpened";
 
@@ -78,16 +81,6 @@ public class PushwooshPlugin extends ReactContextBaseJavaModule implements Lifec
 
 		Pushwoosh.getInstance().setAppId(appId);
 		Pushwoosh.getInstance().setSenderId(projectId);
-
-		synchronized (sStartPushLock) {
-			if (sStartPushData != null) {
-				sendEvent(PUSH_OPEN_JS_EVENT, ConversionUtil.stringToJSONObject(sStartPushData));
-			}
-
-			if (sReceivedPushData != null) {
-				sendEvent(PUSH_RECEIVED_JS_EVENT, ConversionUtil.stringToJSONObject(sReceivedPushData));
-			}
-		}
 
 		sInitialized = true;
 
@@ -267,23 +260,55 @@ public class PushwooshPlugin extends ReactContextBaseJavaModule implements Lifec
 		PushwooshNotificationSettings.setVibrateNotificationType(VibrateType.fromInt(type));
 	}
 
+	@ReactMethod
+	public void pump(Callback success) {
+		WritableMap map = Arguments.createMap();
+		boolean hasData = false;
+
+		synchronized (sStartPushLock) {
+			if (sStartPushData != null) {
+				Log.v(TAG, "Pump from push opened");
+				if (success != null) {
+					map.putMap("opened", ConversionUtil.toWritableMap(ConversionUtil.stringToJSONObject(sStartPushData)));
+					hasData = true;
+				}
+				sendEvent(PUSH_OPEN_JS_EVENT, ConversionUtil.stringToJSONObject(sStartPushData));
+				sStartPushData = null;
+			}
+
+			if (sReceivedPushData != null) {
+				Log.v(TAG, "Pump from push received");
+				if (success != null) {
+					map.putMap("received", ConversionUtil.toWritableMap(ConversionUtil.stringToJSONObject(sReceivedPushData)));
+					hasData = true;
+				}
+				sendEvent(PUSH_RECEIVED_JS_EVENT, ConversionUtil.stringToJSONObject(sReceivedPushData));
+				sReceivedPushData = null;
+			}
+
+			if (hasData) {
+				success.invoke(map);
+			}
+		}
+	}
+
 	///
 	/// LifecycleEventListener callbacks
 	///
 
 	@Override
 	public void onHostResume() {
-		PWLog.noise(TAG, "Host resumed");
+		Log.v(TAG, "Host resumed");
 	}
 
 	@Override
 	public void onHostPause() {
-		PWLog.noise(TAG, "Host paused");
+		Log.v(TAG, "Host paused");
 	}
 
 	@Override
 	public void onHostDestroy() {
-		PWLog.noise(TAG, "Host destroyed");
+		Log.v(TAG, "Host destroyed");
 
 		sPushCallbackRegistered = false;
 		sStartPushData = null;
@@ -297,7 +322,7 @@ public class PushwooshPlugin extends ReactContextBaseJavaModule implements Lifec
 	///
 
 	static void openPush(String pushData) {
-		PWLog.info(TAG, "Push open: " + pushData);
+		Log.i(TAG, "Push open: " + pushData);
 
 		try {
 			synchronized (sStartPushLock) {
@@ -307,11 +332,13 @@ public class PushwooshPlugin extends ReactContextBaseJavaModule implements Lifec
 				}
 				if (sInitialized && INSTANCE != null) {
 					INSTANCE.sendEvent(PUSH_OPEN_JS_EVENT, ConversionUtil.stringToJSONObject(pushData));
+				} else {
+					Log.e(TAG, "Push open lost to ReactNative");
 				}
 			}
 		} catch (Exception e) {
 			// React Native is highly unstable
-			PWLog.exception(e);
+			Log.e(TAG, e.getMessage());
 		}
 	}
 
@@ -320,7 +347,7 @@ public class PushwooshPlugin extends ReactContextBaseJavaModule implements Lifec
 	}
 
 	static void messageReceived(String pushData) {
-		PWLog.info(TAG, "Push received: " + pushData);
+		Log.i(TAG, "Push received: " + pushData);
 
 		try {
 			synchronized (sStartPushLock) {
@@ -334,7 +361,7 @@ public class PushwooshPlugin extends ReactContextBaseJavaModule implements Lifec
 			}
 		} catch (Exception e) {
 			// React Native is highly unstable
-			PWLog.exception(e);
+			Log.e(TAG, e.getMessage());
 		}
 	}
 }

@@ -343,6 +343,11 @@ class PushNotification {
 	setVibrateType(type: number) {
 		PushwooshModule.setVibrateType(type);
 	}
+
+	//Function: pump
+	pump(success: Function) {
+		PushwooshModule.pump(success);
+	}
 }
 
 module.exports = new PushNotification();

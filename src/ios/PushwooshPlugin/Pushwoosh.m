@@ -38,24 +38,25 @@ RCT_EXPORT_MODULE();
 
 RCT_EXPORT_METHOD(init:(NSDictionary*)config success:(RCTResponseSenderBlock)success error:(RCTResponseSenderBlock)error) {
 	NSString *appCode = config[@"pw_appid"];
-	
+
 	if (!appCode || ![appCode isKindOfClass:[NSString class]]) {
 		if (error) {
 			error(@[ @"pw_appid is missing" ]);
 		}
-		
+
 		return;
 	}
-	
+
 	[PushNotificationManager initializeWithAppCode:appCode appName:nil];
 	[[PushNotificationManager pushManager] sendAppOpen];
 	[PushNotificationManager pushManager].delegate = self;
 	[UNUserNotificationCenter currentNotificationCenter].delegate = [PushNotificationManager pushManager].notificationCenterDelegate;
-	
+
     if (success) {
         success(@[]);
     }
-    
+
+    /*
 	if (gStartPushData) {
         [self sendJSEvent:kPushReceivedJSEvent withArgs:gStartPushData];
 		[self sendJSEvent:kPushOpenJSEvent withArgs:gStartPushData];
@@ -63,12 +64,13 @@ RCT_EXPORT_METHOD(init:(NSDictionary*)config success:(RCTResponseSenderBlock)suc
         [self sendJSEvent:kPushReceivedJSEvent withArgs:[PushNotificationManager pushManager].launchNotification];
         [self sendJSEvent:kPushOpenJSEvent withArgs:[PushNotificationManager pushManager].launchNotification];
     }
+     */
 }
 
 RCT_EXPORT_METHOD(register:(RCTResponseSenderBlock)success error:(RCTResponseSenderBlock)error) {
 	[[PWEventDispatcher sharedDispatcher] subscribe:success toEvent:kRegistrationSuccesEvent];
 	[[PWEventDispatcher sharedDispatcher] subscribe:error toEvent:kRegistrationErrorEvent];
-	
+
 	[[PushNotificationManager pushManager] registerForPushNotifications];
 }
 
@@ -81,7 +83,7 @@ RCT_EXPORT_METHOD(unregister:(RCTResponseSenderBlock)success error:(RCTResponseS
 
 RCT_EXPORT_METHOD(onPushOpen:(RCTResponseSenderBlock)callback) {
 	[[PWEventDispatcher sharedDispatcher] subscribe:callback toEvent:kPushOpenEvent];
-	
+
 	if (gStartPushData) {
 		NSDictionary *pushData = gStartPushData;
 		gStartPushData = nil;
@@ -91,11 +93,23 @@ RCT_EXPORT_METHOD(onPushOpen:(RCTResponseSenderBlock)callback) {
 
 RCT_EXPORT_METHOD(onPushReceived:(RCTResponseSenderBlock)callback) {
     [[PWEventDispatcher sharedDispatcher] subscribe:callback toEvent:kPushReceivedEvent];
-    
+
     if (gStartPushData) {
         NSDictionary *pushData = gStartPushData;
         gStartPushData = nil;
         [[PWEventDispatcher sharedDispatcher] dispatchEvent:kPushReceivedEvent withArgs:@[ objectOrNull(pushData) ]];
+    }
+}
+
+RCT_EXPORT_METHOD(pump:(RCTResponseSenderBlock)callback) {
+    if (gStartPushData) {
+        NSDictionary *pushData = gStartPushData;
+        if (callback) {
+            callback(@[ @{ @"opened": objectOrNull( pushData ) } ]);
+        } else {
+            [self sendJSEvent:kPushOpenJSEvent withArgs:pushData];
+        }
+        gStartPushData = nil;
     }
 }
 
@@ -116,7 +130,7 @@ RCT_EXPORT_METHOD(setTags:(NSDictionary*)tags success:(RCTResponseSenderBlock)su
 		if (!error && successCallback) {
 			successCallback(@[]);
 		}
-		
+
 		if (error && errorCallback) {
 			errorCallback(@[ objectOrNull([error localizedDescription]) ]);
 		}
@@ -193,7 +207,7 @@ RCT_EXPORT_METHOD(addToApplicationIconBadgeNumber:(nonnull NSNumber*)badgeNumber
 
 - (void)onPushReceived:(PushNotificationManager *)pushManager withNotification:(NSDictionary *)pushNotification onStart:(BOOL)onStart {
     [[PWEventDispatcher sharedDispatcher] dispatchEvent:kPushReceivedEvent withArgs:@[ objectOrNull(pushNotification) ]];
-    
+
     if ([[UIApplication sharedApplication] applicationState] != UIApplicationStateBackground) {
         [self sendJSEvent:kPushReceivedJSEvent withArgs:pushNotification];
     }
@@ -201,7 +215,7 @@ RCT_EXPORT_METHOD(addToApplicationIconBadgeNumber:(nonnull NSNumber*)badgeNumber
 
 - (void)onPushAccepted:(PushNotificationManager *)manager withNotification:(NSDictionary *)pushNotification onStart:(BOOL)onStart {
 	[[PWEventDispatcher sharedDispatcher] dispatchEvent:kPushOpenEvent withArgs:@[ objectOrNull(pushNotification) ]];
-	
+
 	if ([[UIApplication sharedApplication] applicationState] != UIApplicationStateBackground) {
 		[self sendJSEvent:kPushOpenJSEvent withArgs:pushNotification];
 	}
@@ -233,6 +247,18 @@ RCT_EXPORT_METHOD(addToApplicationIconBadgeNumber:(nonnull NSNumber*)badgeNumber
     }
 }
 - (void)onPushAccepted:(PushNotificationManager *)manager withNotification:(NSDictionary *)pushNotification onStart:(BOOL)onStart {
+#if 0
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSData *jsonData = [NSJSONSerialization dataWithJSONObject:gStartPushData options:0 error:nil];
+        NSString *jsonRequestData = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+        UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"Pushwoosh"
+                                                        message:[NSString stringWithFormat:@"onPushAccepted UIApplication data:%@", jsonRequestData]
+                                                       delegate:nil
+                                              cancelButtonTitle:@"OK"
+                                              otherButtonTitles:nil];
+        [alert show];
+    });
+#endif
 	if (onStart) {
 		gStartPushData = pushNotification;
 	}
